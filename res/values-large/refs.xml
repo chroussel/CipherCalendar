@@ -1,0 +1,3 @@
+<resources>
+    <item type="layout" name="activity_calendar_list">@layout/activity_calendar_twopane</item>
+</resources>
