@@ -10,8 +10,8 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.Switch;
 import android.widget.TextView;
 import ch.epfl.lasec.ciphercalendar.R;
-import ch.epfl.lasec.ciphercalendar.utils.CalendarContent;
-import ch.epfl.lasec.ciphercalendar.utils.CalendarItem;
+import ch.epfl.lasec.ciphercalendar.calendartools.CalendarContent;
+import ch.epfl.lasec.ciphercalendar.calendartools.CalendarItem;
 
 public class CalendarDetailFragment extends Fragment {
 

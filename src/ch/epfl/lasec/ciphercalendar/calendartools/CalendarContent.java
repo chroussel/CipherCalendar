@@ -1,4 +1,4 @@
-package ch.epfl.lasec.ciphercalendar.utils;
+package ch.epfl.lasec.ciphercalendar.calendartools;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -1,4 +1,4 @@
-package ch.epfl.lasec.ciphercalendar.cipher;
+package ch.epfl.lasec.ciphercalendar.utils;
 
 import java.io.File;
 import java.io.FileInputStream;

@@ -16,7 +16,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import ch.epfl.lasec.ciphercalendar.Constants;
 import ch.epfl.lasec.ciphercalendar.R;
-import ch.epfl.lasec.ciphercalendar.cipher.CipherTool;
+import ch.epfl.lasec.ciphercalendar.utils.CipherTool;
 
 public class AuthenticatorActivity extends AccountAuthenticatorActivity {
 

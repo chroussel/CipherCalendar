@@ -7,7 +7,7 @@ import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import ch.epfl.lasec.ciphercalendar.Constants;
 import ch.epfl.lasec.ciphercalendar.R;
-import ch.epfl.lasec.ciphercalendar.utils.CalendarContent;
+import ch.epfl.lasec.ciphercalendar.calendartools.CalendarContent;
 
 public class CalendarListActivity extends FragmentActivity implements
 	CalendarListFragment.Callbacks {

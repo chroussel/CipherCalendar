@@ -1,4 +1,4 @@
-package ch.epfl.lasec.ciphercalendar.utils;
+package ch.epfl.lasec.ciphercalendar.calendartools;
 
 public class CalendarItem {
 
@@ -29,7 +29,7 @@ public class CalendarItem {
     }
 
     public boolean isSync() {
-	return CalendarContent.CIPHER_ITEMS.contains(this.calendarName);
+	return CalendarContent.CIPHER_ITEMS.contains(calendarName);
     }
 
     @Override

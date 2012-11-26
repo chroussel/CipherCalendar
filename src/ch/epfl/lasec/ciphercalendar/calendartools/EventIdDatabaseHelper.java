@@ -1,4 +1,4 @@
-package ch.epfl.lasec.ciphercalendar.utils;
+package ch.epfl.lasec.ciphercalendar.calendartools;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,9 +21,6 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     private static final String DATABASE_CREATE = "create table " + TABLE_EVENT
 	    + "(" + COLUMN_ID + " integer primary key autoincrement, "
 	    + COLUMN_ID_CIPHER + " integer," + COLUMN_ID_GOOGLE + " integer);";
-    private final String[] allColumns = { EventIdDatabaseHelper.COLUMN_ID,
-	    EventIdDatabaseHelper.COLUMN_ID_CIPHER,
-	    EventIdDatabaseHelper.COLUMN_ID_GOOGLE };
 
     public EventIdDatabaseHelper(Context context, String name,
 	    CursorFactory factory, int version) {
@@ -49,7 +46,7 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     }
 
     public int getCipherId(int googleId) {
-	SQLiteDatabase db = this.getReadableDatabase();
+	SQLiteDatabase db = getReadableDatabase();
 	String[] selection = { COLUMN_ID_CIPHER };
 	Cursor cursor = db.query(TABLE_EVENT, selection, COLUMN_ID_GOOGLE
 		+ "=?", new String[] { String.valueOf(googleId) }, null, null,
@@ -65,7 +62,7 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     }
 
     public int getGoogleId(int cipherId) {
-	SQLiteDatabase db = this.getReadableDatabase();
+	SQLiteDatabase db = getReadableDatabase();
 	String[] selection = { COLUMN_ID_GOOGLE };
 	Cursor cursor = db.query(TABLE_EVENT, selection, COLUMN_ID_CIPHER
 		+ "=?", new String[] { String.valueOf(cipherId) }, null, null,
@@ -83,7 +80,7 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     public List<Integer> getAllGoogleId() {
 	List<Integer> listGoogleId = new ArrayList<Integer>();
 	String select = "SELECT" + COLUMN_ID_GOOGLE + "FROM " + TABLE_EVENT;
-	SQLiteDatabase db = this.getReadableDatabase();
+	SQLiteDatabase db = getReadableDatabase();
 	Cursor cursor = db.rawQuery(select, null);
 	if (cursor.moveToFirst()) {
 	    do {
@@ -96,7 +93,7 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     public List<Integer> getAllCipherId() {
 	List<Integer> listCipherId = new ArrayList<Integer>();
 	String select = "SELECT" + COLUMN_ID_CIPHER + "FROM " + TABLE_EVENT;
-	SQLiteDatabase db = this.getReadableDatabase();
+	SQLiteDatabase db = getReadableDatabase();
 	Cursor cursor = db.rawQuery(select, null);
 	if (cursor.moveToFirst()) {
 	    do {
@@ -107,7 +104,7 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     }
 
     public void addEvent(int cipherId, int googleId) {
-	SQLiteDatabase db = this.getWritableDatabase();
+	SQLiteDatabase db = getWritableDatabase();
 
 	ContentValues values = new ContentValues();
 	values.put(COLUMN_ID_CIPHER, cipherId);
@@ -118,7 +115,7 @@ public class EventIdDatabaseHelper extends SQLiteOpenHelper {
     }
 
     public void deleteEvent(int cipherId, int googleId) {
-	SQLiteDatabase db = this.getWritableDatabase();
+	SQLiteDatabase db = getWritableDatabase();
 	String[] selectionArgs = new String[] { Integer.toString(googleId),
 		Integer.toString(cipherId) };
 	String selection = "((" + COLUMN_ID_GOOGLE + "=?) AND ("

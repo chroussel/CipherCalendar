@@ -1,4 +1,4 @@
-package ch.epfl.lasec.ciphercalendar.utils;
+package ch.epfl.lasec.ciphercalendar.calendartools;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,14 +18,13 @@ import android.provider.CalendarContract;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
 import android.util.Log;
-import ch.epfl.lasec.ciphercalendar.cipher.CipherTool;
+import ch.epfl.lasec.ciphercalendar.utils.CipherTool;
 
 public class CalendarContentResolver {
     private static final String TAG = "CalendarContentResolver";
     private static final int PROJECTION_ID_INDEX = 0;
     private static final int PROJECTION_ACCOUNT_NAME_INDEX = 1;
     private static final int PROJECTION_DISPLAY_NAME_INDEX = 2;
-    private static final int PROJECTION_OWNER_ACCOUNT_INDEX = 3;
     private static final int PROJECTION_CALENDAR_COLOR_INDEX = 4;
     private static final int PROJECTION_ACCOUNT_TYPE_INDEX = 5;
     public static final String[] CALENDAR_PROJECTION = new String[] {
@@ -274,7 +273,6 @@ public class CalendarContentResolver {
 	    throw new Exception("Can't decipher Calendar, Bad Name");
 	String accountType = splitName[0];
 	String accountName = splitName[1];
-	String calendarName = splitName[2];
 	String calendarId = splitName[3];
 	Cursor cursor = null;
 	Uri uri = asSyncAdapter(Events.CONTENT_URI, account.name, account.type);

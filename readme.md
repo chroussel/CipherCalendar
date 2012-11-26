@@ -59,6 +59,18 @@ no data on google, no data in calendar, data in database : suppress event
 
 no data on google, data in calendar, any : push data to google
 
+
+
 ---
 Architecture : 
+
+I Android Application Architecture
+
+Authenticator folder regroup file use in authentication progress. These are use when an Account is created on the phone
+
+CalendarChooser is an android activity to choose which calendar will be synchronized.
+
+CalendarTools group every file to manager calendar.
+
+Sync Adapter is a service in android to do the synchronization between google calendars and the applications calendars.
 

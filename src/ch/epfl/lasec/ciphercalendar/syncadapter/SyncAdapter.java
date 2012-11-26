@@ -22,9 +22,9 @@ import android.content.SyncResult;
 import android.os.Bundle;
 import android.util.Log;
 import ch.epfl.lasec.ciphercalendar.Constants;
-import ch.epfl.lasec.ciphercalendar.cipher.CipherTool;
-import ch.epfl.lasec.ciphercalendar.utils.CalendarContentResolver;
-import ch.epfl.lasec.ciphercalendar.utils.CalendarItem;
+import ch.epfl.lasec.ciphercalendar.calendartools.CalendarContentResolver;
+import ch.epfl.lasec.ciphercalendar.calendartools.CalendarItem;
+import ch.epfl.lasec.ciphercalendar.utils.CipherTool;
 
 public class SyncAdapter extends AbstractThreadedSyncAdapter {
     private static final String TAG = "SyncAdapter";
