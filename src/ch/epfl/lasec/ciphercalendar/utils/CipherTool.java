@@ -95,6 +95,10 @@ public class CipherTool {
 	    NoSuchPaddingException, IllegalBlockSizeException,
 	    BadPaddingException, InvalidParameterSpecException,
 	    UnsupportedEncodingException {
+	if (plainText == null)
+	    return null;
+	if (plainText == "")
+	    return "";
 	Log.v(TAG, "cipher()");
 	Cipher cipher = Cipher.getInstance(cipherMethod);
 	cipher.init(Cipher.ENCRYPT_MODE, key);
@@ -115,7 +119,10 @@ public class CipherTool {
 	    NoSuchAlgorithmException, NoSuchPaddingException,
 	    IllegalBlockSizeException, BadPaddingException,
 	    UnsupportedEncodingException {
-
+	if (cipherText64 == null)
+	    return null;
+	if (cipherText64 == "")
+	    return "";
 	byte[] message = Base64.decode(cipherText64, Base64.DEFAULT);
 	Log.v(TAG, "decipher(): " + Arrays.toString(message));
 	byte[] cipherText = Arrays.copyOfRange(message, 0, message.length - 16);

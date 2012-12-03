@@ -56,7 +56,7 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
 		    account.name, account.type);
 	    for (CalendarItem calendar : Calendars) {
 		calendarContentResolver.syncCalendar(getContext(), calendar,
-			secretKey, account);
+			secretKey);
 	    }
 	} catch (UnrecoverableKeyException e) {
 	    // TODO Auto-generated catch block

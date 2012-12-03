@@ -47,7 +47,7 @@ public class CalendarContent {
 	    String[] separated = item.calendarName.split("::");
 	    Log.v(TAG, "addItem :" + Arrays.toString(separated));
 	    if (separated.length > 0)
-		CIPHER_ITEMS.add(separated[separated.length - 1]);
+		CIPHER_ITEMS.add(separated[2]);
 	}
     }
 

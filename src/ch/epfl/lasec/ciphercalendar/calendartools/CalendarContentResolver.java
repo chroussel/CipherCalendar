@@ -1,10 +1,17 @@
 package ch.epfl.lasec.ciphercalendar.calendartools;
 
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidParameterSpecException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 
 import android.accounts.Account;
@@ -17,7 +24,9 @@ import android.net.Uri;
 import android.provider.CalendarContract;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
+import android.support.v4.util.LongSparseArray;
 import android.util.Log;
+import ch.epfl.lasec.ciphercalendar.Constants;
 import ch.epfl.lasec.ciphercalendar.utils.CipherTool;
 
 public class CalendarContentResolver {
@@ -64,16 +73,16 @@ public class CalendarContentResolver {
 	    calendars.add(new CalendarItem(Long.toString(calID), displayName,
 		    accountName, accountType, color));
 	}
+	cur.close();
 	Log.v(TAG, "getCalendar Success");
 	return calendars;
     }
 
     public static final String[] EVENT_PROJECTION = new String[] { Events._ID,
-	    Events.ORGANIZER, Events.TITLE, Events.EVENT_LOCATION,
-	    Events.DESCRIPTION, Events.EVENT_COLOR, Events.DTSTART,
-	    Events.DTEND, Events.EVENT_TIMEZONE, Events.EVENT_END_TIMEZONE,
-	    Events.DURATION, Events.ALL_DAY, Events.RRULE, Events.EXRULE,
-	    Events.ACCESS_LEVEL, Events.AVAILABILITY };
+	    Events.TITLE, Events.EVENT_LOCATION, Events.DESCRIPTION,
+	    Events.EVENT_COLOR, Events.DTSTART, Events.DTEND, Events.DURATION,
+	    Events.ALL_DAY, Events.RRULE, Events.EXRULE, Events.ACCESS_LEVEL,
+	    Events.AVAILABILITY };
 
     public Set<String> getEvents(String CalendarId) {
 	Set<String> EventList = new HashSet<String>();
@@ -91,6 +100,7 @@ public class CalendarContentResolver {
 	    title = cursor.getString(0);
 	    EventList.add(title);
 	}
+	cursor.close();
 	Log.v(TAG, "getEvents Success");
 	return EventList;
     }
@@ -131,6 +141,7 @@ public class CalendarContentResolver {
 	    calendars.add(new CalendarItem(Long.toString(calID), displayName,
 		    accountName, accountType, color));
 	}
+	cur.close();
 	Log.v(TAG, "getAllCalendar Success");
 	return calendars;
     }
@@ -187,146 +198,251 @@ public class CalendarContentResolver {
 	Log.v(TAG, "Calendar deleted:" + deleteUri + "-" + deleteRow);
     }
 
-    public void syncCalendar(Context context, CalendarItem calendar,
-	    SecretKey secretKey, Account account) throws Exception {
+    public void syncCalendar(Context context, CalendarItem localCalendar,
+	    SecretKey secretKey) throws Exception {
 	Log.v(TAG, "syncCalendar()");
-	EventIdDatabaseHelper dbHelper = new EventIdDatabaseHelper(context);
-	pullCalendar(dbHelper, calendar, secretKey, account);
-	pushCalendar(dbHelper, calendar, secretKey, account);
-    }
 
-    private void pullCalendar(EventIdDatabaseHelper dbHelper,
-	    CalendarItem calendar, SecretKey secretKey, Account account)
-	    throws Exception {
-	Log.v(TAG, "pullCalendar()" + calendar.calendarName);
-	String[] splitName = calendar.calendarName.split("::");
-	if (splitName.length != 4)
-	    throw new Exception("Can't decipher Calendar, Bad Name");
+	EventIdDatabaseHelper dbHelper = new EventIdDatabaseHelper(context);
+	String[] splitName = localCalendar.calendarName.split("::");
 	String accountType = splitName[0];
 	String accountName = splitName[1];
 	String calendarName = splitName[2];
 	String calendarId = splitName[3];
-	Cursor cursor = null;
-	Uri uri = asSyncAdapter(Events.CONTENT_URI, accountName, accountType);
-	String selection = "((" + Events.CALENDAR_ID + " = ?) AND ("
-		+ Events.CALENDAR_DISPLAY_NAME + " = ?))";
-	String[] selectionArgs = { calendarId, calendarName };
 
-	cursor = contentResolver.query(uri, EVENT_PROJECTION, selection,
-		selectionArgs, null);
-	String[] columnNames = cursor.getColumnNames();
+	CalendarItem distantCalendar = new CalendarItem(calendarId,
+		calendarName, accountName, accountType, 0);
 
-	while (cursor.moveToNext()) {
-	    ContentValues values = new ContentValues();
-	    values.put(Events.CALENDAR_ID, calendar.id);
-	    int googleId = cursor.getInt(0);
-	    for (int i = 1; i < columnNames.length; i++) {
-		String columnName = columnNames[i];
-		String data = null;
-		String rawdata = cursor.getString(i);
-		if (rawdata != null && !rawdata.isEmpty()) {
-		    if (columnName.equals(Events.TITLE)
-			    || columnName.equals(Events.DESCRIPTION)
-			    || columnName.equals(Events.EVENT_LOCATION)) {
-			data = CipherTool.decipher(rawdata, secretKey);
-			Log.v(TAG, "pullCalendar(): " + data);
-		    } else {
-			data = rawdata;
-		    }
-		}
-		values.put(columnNames[i], data);
-	    }
-	    int eventId = dbHelper.getCipherId(googleId);
-	    Log.v(TAG, "pullCalendar(): " + eventId);
-	    if (eventId == -1) {
-		Uri insertUri = asSyncAdapter(Events.CONTENT_URI, account.name,
-			account.type);
-		Uri insertedUri = contentResolver.insert(insertUri, values);
-		eventId = Integer.valueOf(insertedUri.getLastPathSegment());
-		dbHelper.addEvent(eventId, googleId);
+	LongSparseArray<ContentValues> localCalendarEvents = fetchCalendar(
+		dbHelper, localCalendar, null);
+	LongSparseArray<ContentValues> distantCalendarEvents = fetchCalendar(
+		dbHelper, distantCalendar, secretKey);
+
+	for (int i = 0; i < distantCalendarEvents.size(); i++) {
+	    long distantId = distantCalendarEvents.keyAt(i);
+	    long localId = dbHelper.getLocalId(distantId);
+	    if (localId == -1) {
+		Log.v(TAG, "syncCalendar : pull from distant");
+		// Event on distant but no event on localCalendar
+		// Pull data.
+		ContentValues distantValues = distantCalendarEvents.valueAt(i);
+		addEvent(dbHelper, distantValues, localCalendar, distantId,
+			false);
+
 	    } else {
-		Uri editsUri = asSyncAdapter(Events.CONTENT_URI, account.name,
-			account.type);
-		Uri editUri = ContentUris.withAppendedId(editsUri, eventId);
-		int nbRow = contentResolver.update(editUri, values, null, null);
-		if (nbRow == 0) {
-		    dbHelper.deleteEvent(eventId, googleId);
-		    Uri insertUri = asSyncAdapter(Events.CONTENT_URI,
-			    account.name, account.type);
-		    Uri insertedUri = contentResolver.insert(insertUri, values);
-		    eventId = Integer.valueOf(insertedUri.getLastPathSegment());
-		    dbHelper.addEvent(eventId, googleId);
+		Log.v(TAG, "syncCalendar: (" + distantId + " ; " + localId
+			+ ")");
+		ContentValues localValues = localCalendarEvents.get(localId);
+		if (localValues == null) {
+		    Log.v(TAG, "syncCalendar : delete distant");
+		    // Event on distant but was in local; delete on distant
+		    deleteEvent(dbHelper, distantCalendar, distantId, true);
+		} else {
+		    Log.v(TAG, "syncCalendar : merge");
+		    ContentValues distantValues = distantCalendarEvents
+			    .valueAt(i);
+		    if (!localValues.equals(distantValues)) {
+			Log.v(TAG, "syncCalendar : ask for user");
+			// Event on both ask user for merge
+			if (askUser()) {
+			    cipher(localValues, secretKey);
+			    updateEvent(localValues, distantCalendar,
+				    distantId, true);
+			} else {
+			    updateEvent(distantValues, localCalendar, localId,
+				    false);
+			}
+			localCalendarEvents.remove(localId);
+		    }
+
 		}
-		Log.v(TAG, "pullCalendar(): nbRow edited: " + nbRow);
 	    }
 	}
-	Log.v(TAG, "pullCalendar Success");
+
+	for (int j = 0; j < localCalendarEvents.size(); j++) {
+	    long localId = localCalendarEvents.keyAt(j);
+	    long distantId = dbHelper.getDistantId(localId);
+
+	    if (distantId == -1) {
+		Log.v(TAG, "syncCalendar : push to distant");
+		// Event to push to distant calendar
+		ContentValues localValues = localCalendarEvents.valueAt(j);
+		cipher(localValues, secretKey);
+		addEvent(dbHelper, localValues, distantCalendar, localId, true);
+	    } else {
+		ContentValues distantValues = distantCalendarEvents
+			.get(distantId);
+		if (distantValues == null) {
+		    deleteEvent(dbHelper, localCalendar, localId, false);
+		    /*
+		     * if (askUser()) { ContentValues localValues =
+		     * localCalendarEvents .valueAt(j); cipher(localValues,
+		     * secretKey); addEvent(dbHelper, localValues,
+		     * distantCalendar, localId, true); }
+		     */
+		}
+	    }
+	}
 
     }
 
-    private void pushCalendar(EventIdDatabaseHelper dbHelper,
-	    CalendarItem calendar, SecretKey secretKey, Account account)
-	    throws Exception {
-	Log.v(TAG, "pushCalendar()");
-	String[] splitName = calendar.calendarName.split("::");
-	if (splitName.length != 4)
-	    throw new Exception("Can't decipher Calendar, Bad Name");
-	String accountType = splitName[0];
-	String accountName = splitName[1];
-	String calendarId = splitName[3];
+    /**
+     * 
+     * @return false if update from distant, true if update from local
+     */
+    private boolean askUser() {
+	return true;
+    }
+
+    /*
+     * private boolean isValuesEqual(ContentValues v1, ContentValues v2) {
+     * Set<String> keySetv1 = v1.keySet(); Set<String> keySetv2 = v2.keySet();
+     * 
+     * if (keySetv1.size() != keySetv2.size()) { Log.v(TAG,
+     * "isValuesEqual different size ( " + keySetv1.size() + " ; " +
+     * keySetv2.size() + ")"); return false; }
+     * 
+     * if (!keySetv1.containsAll(keySetv2)) { Log.v(TAG,
+     * "isValuesEqual: not the same keys"); return false; }
+     * 
+     * for (String key : keySetv1) { Object o1 = v1.get(key); Object o2 =
+     * v2.get(key); if (o1 == null && o2 == null) { continue; } else if (o1 ==
+     * null || o2 == null) { return false; } else if (!o1.equals(o2)) {
+     * Log.v(TAG, "isValuesEqual: not equal values (" + key + ": " +
+     * o1.toString() + ";" + o2.toString() + ")"); return false;
+     * 
+     * } } return true; }
+     */
+    private void cipher(ContentValues values, SecretKey secretKey)
+	    throws InvalidKeyException, NoSuchAlgorithmException,
+	    NoSuchPaddingException, IllegalBlockSizeException,
+	    BadPaddingException, InvalidParameterSpecException,
+	    UnsupportedEncodingException {
+
+	String title = CipherTool.cipher(values.getAsString(Events.TITLE),
+		secretKey);
+	String location = CipherTool.cipher(
+		values.getAsString(Events.EVENT_LOCATION), secretKey);
+	String description = CipherTool.cipher(
+		values.getAsString(Events.DESCRIPTION), secretKey);
+
+	values.put(Events.TITLE, title);
+	values.put(Events.EVENT_LOCATION, location);
+	values.put(Events.DESCRIPTION, description);
+    }
+
+    private void addEvent(EventIdDatabaseHelper dbHelper, ContentValues values,
+	    CalendarItem calendar, long sourceId, boolean distant) {
+	Log.v(TAG, "addEvent( distant:" + distant + " )");
+	Uri insertUri = Events.CONTENT_URI;
+	if (!distant) {
+	    insertUri = asSyncAdapter(insertUri, calendar.accountName,
+		    calendar.accountType);
+	}
+	values.put(Events.EVENT_TIMEZONE, "GMT");
+	values.put(Events.CALENDAR_ID, calendar.id);
+	Uri insertedUri = contentResolver.insert(insertUri, values);
+	long eventId = Long.valueOf(insertedUri.getLastPathSegment());
+	Log.v(TAG, "addEvent: Id: " + eventId);
+	if (distant)
+	    dbHelper.addEvent(sourceId, eventId);
+	else
+	    dbHelper.addEvent(eventId, sourceId);
+
+    }
+
+    private int updateEvent(ContentValues values, CalendarItem calendar,
+	    long eventId, boolean distant) {
+	Log.v(TAG, "updateEvent()");
+	Uri editsUri = Events.CONTENT_URI;
+	if (!distant) {
+	    editsUri = asSyncAdapter(editsUri, calendar.accountName,
+		    calendar.accountType);
+	}
+	values.put(Events.CALENDAR_ID, calendar.id);
+	Uri editUri = ContentUris.withAppendedId(editsUri, eventId);
+	return contentResolver.update(editUri, values, null, null);
+    }
+
+    private int deleteEvent(EventIdDatabaseHelper dbHelper,
+	    CalendarItem calendar, long eventId, boolean distant) {
+	Log.v(TAG, "deleteEvent()");
+	Uri deleteUri = Events.CONTENT_URI;
+	if (!distant) {
+	    deleteUri = asSyncAdapter(deleteUri, calendar.accountName,
+		    calendar.accountType);
+	}
+	String[] selArgs = new String[] { Long.toString(eventId) };
+	if (calendar.accountType.equals(Constants.ACCOUNT_TYPE)) {
+	    dbHelper.deleteEventLocal(eventId);
+	} else {
+	    dbHelper.deleteEventDistant(eventId);
+	}
+	return contentResolver.delete(deleteUri, Events._ID + "=?", selArgs);
+    }
+
+    private LongSparseArray<ContentValues> fetchCalendar(
+	    EventIdDatabaseHelper dbHelper, CalendarItem calendar,
+	    SecretKey secretKey) {
+	Log.v(TAG, "fetchCalendar()");
 	Cursor cursor = null;
-	Uri uri = asSyncAdapter(Events.CONTENT_URI, account.name, account.type);
+	Uri uri = asSyncAdapter(Events.CONTENT_URI, calendar.accountName,
+		calendar.accountType);
 	String selection = "((" + Events.CALENDAR_ID + " = ?) AND ("
 		+ Events.CALENDAR_DISPLAY_NAME + " = ?))";
+
 	String[] selectionArgs = { calendar.id, calendar.calendarName };
 
 	cursor = contentResolver.query(uri, EVENT_PROJECTION, selection,
 		selectionArgs, null);
+
 	String[] columnNames = cursor.getColumnNames();
 
+	LongSparseArray<ContentValues> eventList = new LongSparseArray<ContentValues>();
+
 	while (cursor.moveToNext()) {
-	    ContentValues values = new ContentValues();
-	    values.put(Events.CALENDAR_ID, calendarId);
-	    int eventId = cursor.getInt(0);
-	    for (int i = 1; i < columnNames.length; i++) {
-		String columnName = columnNames[i];
-		String data = null;
-		String rawdata = cursor.getString(i);
-		if (rawdata != null && !rawdata.isEmpty()) {
-		    if (columnName.equals(Events.TITLE)
-			    || columnName.equals(Events.DESCRIPTION)
-			    || columnName.equals(Events.EVENT_LOCATION)) {
-			data = CipherTool.cipher(rawdata, secretKey);
-			Log.v(TAG, "pushCalendar()" + data);
-		    } else {
-			data = rawdata;
+	    try {
+		ContentValues values = new ContentValues();
+
+		int eventId = cursor.getInt(0);
+		for (int i = 1; i < columnNames.length; i++) {
+
+		    String columnName = columnNames[i];
+		    String data = null;
+		    String rawdata = cursor.getString(i);
+		    if (rawdata != null && !rawdata.isEmpty()) {
+			if (secretKey != null
+				&& (columnName.equals(Events.TITLE)
+					|| columnName
+						.equals(Events.DESCRIPTION) || columnName
+					    .equals(Events.EVENT_LOCATION))) {
+
+			    data = CipherTool.decipher(rawdata, secretKey);
+
+			    Log.v(TAG, "fetchCalendar(): " + data);
+			} else {
+			    data = rawdata;
+			}
 		    }
+		    values.put(columnNames[i], data);
 		}
-		values.put(columnNames[i], data);
+		eventList.put(eventId, values);
+		Log.v(TAG, "fetchCalendar: Id: " + eventId);
+	    } catch (Exception e) {
+		// TODO Auto-generated catch block
+		HandleCipherException(e);
 	    }
-	    int googleId = dbHelper.getGoogleId(eventId);
-	    if (googleId == -1) {
-		Uri insertUri = asSyncAdapter(Events.CONTENT_URI, accountName,
-			accountType);
-		Uri insertedUri = contentResolver.insert(insertUri, values);
-		googleId = Integer.valueOf(insertedUri.getLastPathSegment());
-		dbHelper.addEvent(eventId, googleId);
-	    } else {
-		Uri editsUri = asSyncAdapter(Events.CONTENT_URI, accountName,
-			accountType);
-		Uri editUri = ContentUris.withAppendedId(editsUri, googleId);
-		int nbRow = contentResolver.update(editUri, values, null, null);
-		if (nbRow == 0) {
-		    dbHelper.deleteEvent(eventId, googleId);
-		    Uri insertUri = asSyncAdapter(Events.CONTENT_URI,
-			    accountName, accountType);
-		    Uri insertedUri = contentResolver.insert(insertUri, values);
-		    googleId = Integer
-			    .valueOf(insertedUri.getLastPathSegment());
-		    dbHelper.addEvent(eventId, googleId);
-		}
-	    }
+
 	}
-	Log.v(TAG, "push Success");
+	cursor.close();
+	Log.v(TAG, "fetchCalendar Success");
+	return eventList;
+
     }
+
+    private void HandleCipherException(Exception e) {
+	Log.v(TAG, "HandleCipherException()");
+	Log.w(TAG, "Error while fetching event");
+	e.printStackTrace();
+    }
+
 }
